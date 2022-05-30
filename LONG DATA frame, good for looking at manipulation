@@ -1,0 +1,1321 @@
+Big Data and Machine Learning: Group Project
+Step one: Download relevant packages
+import numpy as np
+import pandas as pd
+import seaborn as sns
+For packages not readily available in Python 3:
+
+pip install dbnomics
+Requirement already satisfied: dbnomics in c:\programdata\anaconda3\lib\site-packages (1.2.2)
+Requirement already satisfied: requests>=2.18.4 in c:\programdata\anaconda3\lib\site-packages (from dbnomics) (2.25.1)
+Note: you may need to restart the kernel to use updated packages.
+Requirement already satisfied: pandas>=0.21 in c:\programdata\anaconda3\lib\site-packages (from dbnomics) (1.2.1)
+Requirement already satisfied: python-dateutil>=2.7.3 in c:\programdata\anaconda3\lib\site-packages (from pandas>=0.21->dbnomics) (2.8.1)
+Requirement already satisfied: pytz>=2017.3 in c:\programdata\anaconda3\lib\site-packages (from pandas>=0.21->dbnomics) (2020.5)
+Requirement already satisfied: numpy>=1.16.5 in c:\programdata\anaconda3\lib\site-packages (from pandas>=0.21->dbnomics) (1.19.2)
+Requirement already satisfied: idna<3,>=2.5 in c:\programdata\anaconda3\lib\site-packages (from requests>=2.18.4->dbnomics) (2.10)
+Requirement already satisfied: certifi>=2017.4.17 in c:\programdata\anaconda3\lib\site-packages (from requests>=2.18.4->dbnomics) (2021.10.8)
+Requirement already satisfied: chardet<5,>=3.0.2 in c:\programdata\anaconda3\lib\site-packages (from requests>=2.18.4->dbnomics) (4.0.0)
+Requirement already satisfied: urllib3<1.27,>=1.21.1 in c:\programdata\anaconda3\lib\site-packages (from requests>=2.18.4->dbnomics) (1.26.3)
+Requirement already satisfied: six>=1.5 in c:\programdata\anaconda3\lib\site-packages (from python-dateutil>=2.7.3->pandas>=0.21->dbnomics) (1.15.0)
+from dbnomics import fetch_series, fetch_series_by_api_link
+​
+Step 2: Download the data
+Let's first try and download our target variable: Central Government Net Cash Requirement (CGNCR). This script will use the DBnomics package to download any data from the ONS and BoE that will be used in our group project. Using DBnomics will reduce the time required to upload and adjust data inputs.
+
+cgncr_df = fetch_series('ONS/PUSF/RUUW.Q')
+cgncr_df.head(10)
+@frequency	provider_code	dataset_code	dataset_name	series_code	series_name	original_period	period	original_value	value	title	freq	Title	Frequency
+0	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1946-Q1	1946-01-01	-663.0	-663.0	RUUW	Q	CG: Net cash requirement: £m CPNSA	Quarterly
+1	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1946-Q2	1946-04-01	399.0	399.0	RUUW	Q	CG: Net cash requirement: £m CPNSA	Quarterly
+2	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1946-Q3	1946-07-01	354.0	354.0	RUUW	Q	CG: Net cash requirement: £m CPNSA	Quarterly
+3	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1946-Q4	1946-10-01	373.0	373.0	RUUW	Q	CG: Net cash requirement: £m CPNSA	Quarterly
+4	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1947-Q1	1947-01-01	-687.0	-687.0	RUUW	Q	CG: Net cash requirement: £m CPNSA	Quarterly
+5	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1947-Q2	1947-04-01	195.0	195.0	RUUW	Q	CG: Net cash requirement: £m CPNSA	Quarterly
+6	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1947-Q3	1947-07-01	154.0	154.0	RUUW	Q	CG: Net cash requirement: £m CPNSA	Quarterly
+7	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1947-Q4	1947-10-01	161.0	161.0	RUUW	Q	CG: Net cash requirement: £m CPNSA	Quarterly
+8	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1948-Q1	1948-01-01	-707.0	-707.0	RUUW	Q	CG: Net cash requirement: £m CPNSA	Quarterly
+9	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1948-Q2	1948-04-01	20.0	20.0	RUUW	Q	CG: Net cash requirement: £m CPNSA	Quarterly
+Here, we have stored the data in the data frame named 'psncr_df' by fetching a series which is defined by the provider (ONS), the dataset ID (PUSF or the public sector finances times series), and the specific ID code of the timeseries (JW38) on a quarterly frequency (Q).
+
+Let's use seaborn package to see how CGNRC has trended over time:
+
+import seaborn as sns
+sns.set_theme(style="darkgrid")
+from pylab import rcParams
+rcParams['figure.figsize'] = 10,4
+​
+CGNCR = sns.lineplot(data=cgncr_df, x="period", y="value", color='b').set_title('CGNRC over time, £m - Quarterly')
+CGNCR
+​
+Text(0.5, 1.0, 'CGNRC over time, £m - Quarterly')
+
+From looking at that chart above, we can see that we have a non-stationary dataset due to the increasing trend from lower left to upper right, as well as some seasonality across each period t.
+
+To render the data stationary, we will normalise such by placing any variables on a % to GDP basis going forward.
+
+Now, let's try and collect multiple series in one data frame and call it "long data frame":
+
+df_long = fetch_series(['ONS/PUSF/RUUW.Q', # CG: Net cash requirement: £m CPNSA,
+                       'ONS/UKEA/BKTL.Q', # Gross Domestic Product at market prices: CP: NSA £m – Quarterly,
+                        'ONS/PUSF/HF6W.Q', # PS: Net Debt (excluding public sector banks): £bn: CPNSA – Quarterly,
+                        'ONS/PUSF/NMFX.Q', # CG: Current expenditure: Interest payable: £m CPNSA – Quarterly,
+                        'ONS/PUSF/MU74.Q', # BoE: Current exp: Interest & dividends paid to private sector and RoW: £m CPNSA – Quarterly,
+                        'ONS/LMS/MGSX.Q', # Unemployment rate (aged 16 and over, seasonally adjusted) – Quarterly,
+                        'ONS/LMS/MGUK.Q', # LFS: ILO unemployment rate: UK: All: Aged 16 and over: %: NSA – Quarterly,
+                        'ONS/MM23/D7G7.Q', # CPI ANNUAL RATE 00: ALL ITEMS 2015=100 – Quarterly,
+                        'ONS/UKEA/BKVT.Q', # Gross Domestic Product: CVM: NSA £m – Quarterly,
+                        'ONS/UKEA/IHYQ.Q', # Gross Domestic Product: Quarter on Quarter growth: CVM SA % – Quarterly,
+                        'ONS/UKEA/YBGB.Q', # Gross domestic product at market prices:Implied deflator:SA – Quarterly,
+                        'ONS/CXNV/NPEN.Q', # Gross Fixed Capital Formation: Business Investment: CVM NSA: £m – Quarterly,
+                        'ONS/CXNV/NPQR.Q', # Total Gross Fixed Capital Formation CVM NSA £m – Quarterly,
+                        'ONS/UKEA/ABJR.Q', # Household final consumption expenditure :National concept CVM SA - £m – Quarterly,
+                        'ONS/LMS/LF2S.Q', # LFS: Economic inactivity rate: UK: All: Aged 16-64: %: SA – Quarterly,
+                        'ONS/LMS/YBUS.Q', # LFS: Total actual weekly hours worked (millions): UK: All: SA – Quarterly,
+                        'ONS/PRDY/LZVD.Q', # UK Whole Economy: Output per hour worked % change per annum SA – Quarterly,
+                        'ONS/UKEA/DG5H.Q', # Households (S.14): Households' saving ratio (per cent): Current price: £m: NSA – Quarterly,
+                        'ONS/PNBP/HBOP.Q' # BoP Current Account Balance SA £m – Quarterly,
+                       ])
+​
+df_long
+@frequency	provider_code	dataset_code	dataset_name	series_code	series_name	original_period	period	original_value	value	...	Title	Frequency	Title	Frequency	Title	Frequency	Title	Frequency	Title	Frequency
+0	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1946-Q1	1946-01-01	-663.0	-663.0	...	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly
+1	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1946-Q2	1946-04-01	399.0	399.0	...	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly
+2	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1946-Q3	1946-07-01	354.0	354.0	...	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly
+3	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1946-Q4	1946-10-01	373.0	373.0	...	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly
+4	quarterly	ONS	PUSF	Public sector finances time series	RUUW.Q	CG: Net cash requirement: £m CPNSA – Quarterly	1947-Q1	1947-01-01	-687.0	-687.0	...	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly	CG: Net cash requirement: £m CPNSA	Quarterly
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+298	quarterly	ONS	PNBP	Balance of payments time series	HBOP.Q	BoP Current Account Balance SA £m – Quarterly	2020-Q3	2020-07-01	-8254.0	-8254.0	...	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly
+299	quarterly	ONS	PNBP	Balance of payments time series	HBOP.Q	BoP Current Account Balance SA £m – Quarterly	2020-Q4	2020-10-01	-26030.0	-26030.0	...	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly
+300	quarterly	ONS	PNBP	Balance of payments time series	HBOP.Q	BoP Current Account Balance SA £m – Quarterly	2021-Q1	2021-01-01	-11317.0	-11317.0	...	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly
+301	quarterly	ONS	PNBP	Balance of payments time series	HBOP.Q	BoP Current Account Balance SA £m – Quarterly	2021-Q2	2021-04-01	-13462.0	-13462.0	...	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly
+302	quarterly	ONS	PNBP	Balance of payments time series	HBOP.Q	BoP Current Account Balance SA £m – Quarterly	2021-Q3	2021-07-01	-24444.0	-24444.0	...	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly	BoP Current Account Balance SA £m	Quarterly
+5427 rows × 38 columns
+
+Step three: Reshape the data
+Moving from a long format to a wide format.
+
+df_wide = df_long.pivot(index = 'period', columns = 'series_name', values = 'value')
+​
+df_wide
+series_name	BoE: Current exp: Interest & dividends paid to private sector and RoW: £m CPNSA – Quarterly	BoP Current Account Balance SA £m – Quarterly	CG: Current expenditure: Interest payable: £m CPNSA – Quarterly	CG: Net cash requirement: £m CPNSA – Quarterly	CPI ANNUAL RATE 00: ALL ITEMS 2015=100 – Quarterly	Gross Domestic Product at market prices: CP: NSA £m – Quarterly	Gross Domestic Product: CVM: NSA £m – Quarterly	Gross Domestic Product: Quarter on Quarter growth: CVM SA % – Quarterly	Gross Fixed Capital Formation: Business Investment: CVM NSA: £m – Quarterly	Gross domestic product at market prices:Implied deflator:SA – Quarterly	Household final consumption expenditure :National concept CVM SA - £m – Quarterly	Households (S.14): Households' saving ratio (per cent): Current price: £m: NSA – Quarterly	LFS: Economic inactivity rate: UK: All: Aged 16-64: %: SA – Quarterly	LFS: ILO unemployment rate: UK: All: Aged 16 and over: %: NSA – Quarterly	LFS: Total actual weekly hours worked (millions): UK: All: SA – Quarterly	PS: Net Debt (excluding public sector banks): £bn: CPNSA – Quarterly	Total Gross Fixed Capital Formation CVM NSA £m – Quarterly	UK Whole Economy: Output per hour worked % change per annum SA – Quarterly	Unemployment rate (aged 16 and over, seasonally adjusted) – Quarterly
+period																			
+1946-01-01	0.0	NaN	124.0	-663.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-04-01	0.0	NaN	124.0	399.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-07-01	0.0	NaN	124.0	354.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-10-01	0.0	NaN	124.0	373.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1947-01-01	0.0	NaN	132.0	-687.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+2021-04-01	-4184.0	-13462.0	17802.0	73422.0	2.1	571803.0	544298.0	5.4	50864.0	105.0	330844.0	13.9	21.1	4.5	1001.3	2204.7	92265.0	4.9	4.7
+2021-07-01	-4096.0	-24444.0	14760.0	24624.0	2.8	584928.0	552277.0	1.1	50358.0	105.5	339794.0	7.7	21.1	4.4	1026.6	2207.7	94745.0	-4.5	4.3
+2021-10-01	NaN	NaN	NaN	NaN	4.9	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+2022-01-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+2022-04-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+306 rows × 19 columns
+
+Step four: Rename columns, clean the data, and manipulate results
+list(df_wide)
+['BoE: Current exp: Interest & dividends paid to private sector and RoW: £m CPNSA – Quarterly',
+ 'BoP Current Account Balance SA £m – Quarterly',
+ 'CG: Current expenditure: Interest payable: £m CPNSA – Quarterly',
+ 'CG: Net cash requirement: £m CPNSA – Quarterly',
+ 'CPI ANNUAL RATE 00: ALL ITEMS 2015=100 – Quarterly',
+ 'Gross Domestic Product at market prices: CP: NSA £m – Quarterly',
+ 'Gross Domestic Product: CVM: NSA £m – Quarterly',
+ 'Gross Domestic Product: Quarter on Quarter growth: CVM SA % – Quarterly',
+ 'Gross Fixed Capital Formation: Business Investment: CVM NSA: £m – Quarterly',
+ 'Gross domestic product at market prices:Implied deflator:SA – Quarterly',
+ 'Household final consumption expenditure :National concept CVM SA - £m – Quarterly',
+ "Households (S.14): Households' saving ratio (per cent): Current price: £m: NSA – Quarterly",
+ 'LFS: Economic inactivity rate: UK: All: Aged 16-64: %: SA – Quarterly',
+ 'LFS: ILO unemployment rate: UK: All: Aged 16 and over: %: NSA – Quarterly',
+ 'LFS: Total actual weekly hours worked (millions): UK: All: SA – Quarterly',
+ 'PS: Net Debt (excluding public sector banks): £bn: CPNSA – Quarterly',
+ 'Total Gross Fixed Capital Formation CVM NSA £m – Quarterly',
+ 'UK Whole Economy: Output per hour worked % change per annum SA – Quarterly',
+ 'Unemployment rate (aged 16 and over, seasonally adjusted) – Quarterly']
+cols = ['boe_interest', 'current_account_bal', 'interest', 'cgncr', 'infl', 'nominal_gdp', 'real_gdp', 'rgdpgr_QoQ', 'nom_bus_inv', 'growth_defl', 'household_consumption', 'savings_ratio', 'inactivity', 'unemployment', 'twhw', 'psnd', 'nom_total_gfcf', 'prodgrowth_QoQ', 'unemployment_SA']
+df_wide.set_axis(cols, axis = 1, inplace = True)
+df_wide
+boe_interest	current_account_bal	interest	cgncr	infl	nominal_gdp	real_gdp	rgdpgr_QoQ	nom_bus_inv	growth_defl	household_consumption	savings_ratio	inactivity	unemployment	twhw	psnd	nom_total_gfcf	prodgrowth_QoQ	unemployment_SA
+period																			
+1946-01-01	0.0	NaN	124.0	-663.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-04-01	0.0	NaN	124.0	399.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-07-01	0.0	NaN	124.0	354.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-10-01	0.0	NaN	124.0	373.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1947-01-01	0.0	NaN	132.0	-687.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+2021-04-01	-4184.0	-13462.0	17802.0	73422.0	2.1	571803.0	544298.0	5.4	50864.0	105.0	330844.0	13.9	21.1	4.5	1001.3	2204.7	92265.0	4.9	4.7
+2021-07-01	-4096.0	-24444.0	14760.0	24624.0	2.8	584928.0	552277.0	1.1	50358.0	105.5	339794.0	7.7	21.1	4.4	1026.6	2207.7	94745.0	-4.5	4.3
+2021-10-01	NaN	NaN	NaN	NaN	4.9	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+2022-01-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+2022-04-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+306 rows × 19 columns
+
+df_wide.fillna(0)
+boe_interest	current_account_bal	interest	cgncr	infl	nominal_gdp	real_gdp	rgdpgr_QoQ	nom_bus_inv	growth_defl	household_consumption	savings_ratio	inactivity	unemployment	twhw	psnd	nom_total_gfcf	prodgrowth_QoQ	unemployment_SA
+period																			
+1946-01-01	0.0	0.0	124.0	-663.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+1946-04-01	0.0	0.0	124.0	399.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+1946-07-01	0.0	0.0	124.0	354.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+1946-10-01	0.0	0.0	124.0	373.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+1947-01-01	0.0	0.0	132.0	-687.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+2021-04-01	-4184.0	-13462.0	17802.0	73422.0	2.1	571803.0	544298.0	5.4	50864.0	105.0	330844.0	13.9	21.1	4.5	1001.3	2204.7	92265.0	4.9	4.7
+2021-07-01	-4096.0	-24444.0	14760.0	24624.0	2.8	584928.0	552277.0	1.1	50358.0	105.5	339794.0	7.7	21.1	4.4	1026.6	2207.7	94745.0	-4.5	4.3
+2021-10-01	0.0	0.0	0.0	0.0	4.9	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+2022-01-01	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+2022-04-01	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0	0.0
+306 rows × 19 columns
+
+Now, manipulate the data to produce outputs that are necessary for model specification:
+
+df_wide['eir'] = ((df_wide['interest'] + df_wide['boe_interest'])/(df_wide['psnd'].shift(1)*1000))*100 # Effective interest rate is equal to net interest over the lag of debt (in millions) multiplied by 100
+df_wide['cb'] = (df_wide['current_account_bal'] / df_wide['nominal_gdp'])*100 # take current account balance as a share of GDP
+df_wide['cgncr'] = (df_wide['cgncr'] / df_wide['nominal_gdp'])*100 # take CGNCR as a share of GDP
+df_wide['inv'] = (df_wide['nom_bus_inv'] / df_wide['nominal_gdp'])*100 # take business investment as a share of GDP
+df_wide['household_consumption'] = (df_wide['household_consumption'] / df_wide['nominal_gdp'])*100 # take household consumption as a share of GDP
+df_wide['twhwgr'] = ((df_wide['twhw']/df_wide['twhw'].shift(1))-1)*100 # take % growth in hours worked quarter on quarter
+df_wide['total_gfcf'] = (df_wide['nom_total_gfcf'] / df_wide['nominal_gdp'])*100 # take total GFCF as a share of GDP
+df_wide
+boe_interest	current_account_bal	interest	cgncr	infl	nominal_gdp	real_gdp	rgdpgr_QoQ	nom_bus_inv	growth_defl	...	twhw	psnd	nom_total_gfcf	prodgrowth_QoQ	unemployment_SA	eir	cb	inv	twhwgr	total_gfcf
+period																					
+1946-01-01	0.0	NaN	124.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-04-01	0.0	NaN	124.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-07-01	0.0	NaN	124.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-10-01	0.0	NaN	124.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1947-01-01	0.0	NaN	132.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+2021-04-01	-4184.0	-13462.0	17802.0	12.840436	2.1	571803.0	544298.0	5.4	50864.0	105.0	...	1001.3	2204.7	92265.0	4.9	4.7	0.638025	-2.354307	8.895371	5.355640	16.135802
+2021-07-01	-4096.0	-24444.0	14760.0	4.209749	2.8	584928.0	552277.0	1.1	50358.0	105.5	...	1026.6	2207.7	94745.0	-4.5	4.3	0.483694	-4.178976	8.609265	2.526715	16.197720
+2021-10-01	NaN	NaN	NaN	NaN	4.9	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+2022-01-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+2022-04-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+306 rows × 24 columns
+
+df_wide.rename(columns={'boe_interest':'BoE_interest', 'prodgrowth_QoQ':'productivity'}, inplace=True)
+​
+df_wide
+BoE_interest	current_account_bal	interest	cgncr	infl	nominal_gdp	real_gdp	rgdpgr_QoQ	nom_bus_inv	growth_defl	...	twhw	psnd	nom_total_gfcf	productivity	unemployment_SA	eir	cb	inv	twhwgr	total_gfcf
+period																					
+1946-01-01	0.0	NaN	124.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-04-01	0.0	NaN	124.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-07-01	0.0	NaN	124.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1946-10-01	0.0	NaN	124.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+1947-01-01	0.0	NaN	132.0	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+2021-04-01	-4184.0	-13462.0	17802.0	12.840436	2.1	571803.0	544298.0	5.4	50864.0	105.0	...	1001.3	2204.7	92265.0	4.9	4.7	0.638025	-2.354307	8.895371	5.355640	16.135802
+2021-07-01	-4096.0	-24444.0	14760.0	4.209749	2.8	584928.0	552277.0	1.1	50358.0	105.5	...	1026.6	2207.7	94745.0	-4.5	4.3	0.483694	-4.178976	8.609265	2.526715	16.197720
+2021-10-01	NaN	NaN	NaN	NaN	4.9	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+2022-01-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+2022-04-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	...	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+306 rows × 24 columns
+
+Creating a baseline model
+Step one: Slice data frame to only include predictors outlined in model specification
+df = df_wide[['cgncr', # Central Gov Net Cash Requirement
+              'cb', # Current Account Balance as a % of GDP
+              'infl', 
+              'rgdpgr_QoQ', # Real GDP growth, QoQ
+              'household_consumption', 
+              'savings_ratio', 
+              'inactivity',
+              'unemployment', 
+              'twhwgr', # Total Hours Worked / Week Growth, QoQ
+              'productivity', # Productivity Growth, QoQ
+              'BoE_interest', 
+              'eir', # Effective Interest Rate
+              'inv',
+              'total_gfcf' # Total Gross Fixed Capital Formation as % of GDP
+             ]]
+​
+df
+cgncr	cb	infl	rgdpgr_QoQ	household_consumption	savings_ratio	inactivity	unemployment	twhwgr	productivity	BoE_interest	eir	inv	total_gfcf
+period														
+1946-01-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	0.0	NaN	NaN	NaN
+1946-04-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	0.0	NaN	NaN	NaN
+1946-07-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	0.0	NaN	NaN	NaN
+1946-10-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	0.0	NaN	NaN	NaN
+1947-01-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	0.0	NaN	NaN	NaN
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+2021-04-01	12.840436	-2.354307	2.1	5.4	57.859787	13.9	21.1	4.5	5.355640	4.9	-4184.0	0.638025	8.895371	16.135802
+2021-07-01	4.209749	-4.178976	2.8	1.1	58.091594	7.7	21.1	4.4	2.526715	-4.5	-4096.0	0.483694	8.609265	16.197720
+2021-10-01	NaN	NaN	4.9	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+2022-01-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+2022-04-01	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN	NaN
+306 rows × 14 columns
+
+Check for missing data
+
+df.isna().sum()
+cgncr                     39
+cb                        39
+infl                     174
+rgdpgr_QoQ                40
+household_consumption     39
+savings_ratio             71
+inactivity               103
+unemployment             188
+twhwgr                   104
+productivity             107
+BoE_interest               3
+eir                      174
+inv                      207
+total_gfcf                39
+dtype: int64
+Now, let's clean the data and drop any missing rows
+
+df1 = df.dropna(axis=0, how='any', thresh=None, inplace=False)
+df1
+cgncr	cb	infl	rgdpgr_QoQ	household_consumption	savings_ratio	inactivity	unemployment	twhwgr	productivity	BoE_interest	eir	inv	total_gfcf
+period														
+1997-01-01	2.806258	0.279814	1.9	1.8	89.622529	9.6	23.6	7.4	0.877497	1.0	0.0	2.014332	15.101417	26.725449
+1997-04-01	3.823072	-0.436642	1.6	0.8	90.638018	12.7	23.4	7.1	0.526497	1.1	0.0	2.080403	15.416923	25.225364
+1997-07-01	0.694312	-0.042568	1.9	0.7	89.150955	7.3	23.6	7.1	0.216327	0.8	0.0	2.001686	15.656332	25.982576
+1997-10-01	-0.466053	-0.797533	1.8	1.2	89.852506	8.1	23.8	6.4	-0.045444	1.9	0.0	2.152766	16.894327	27.770416
+1998-01-01	-2.442600	-1.497500	1.6	0.7	89.719787	6.0	23.8	6.4	0.488747	2.2	0.0	2.068674	16.862334	28.478299
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+2020-07-01	13.367780	-1.534129	0.6	17.6	60.004461	12.7	21.0	5.1	8.588667	5.7	-3931.0	0.341278	9.087124	16.903118
+2020-10-01	12.743945	-4.631994	0.5	1.5	56.504277	12.5	21.1	5.2	5.588844	1.4	-4052.0	0.224913	9.535715	17.408148
+2021-01-01	3.703245	-2.030013	0.6	-1.3	54.854310	15.8	21.4	4.8	-1.939744	3.0	-4128.0	0.222175	8.412439	17.347942
+2021-04-01	12.840436	-2.354307	2.1	5.4	57.859787	13.9	21.1	4.5	5.355640	4.9	-4184.0	0.638025	8.895371	16.135802
+2021-07-01	4.209749	-4.178976	2.8	1.1	58.091594	7.7	21.1	4.4	2.526715	-4.5	-4096.0	0.483694	8.609265	16.197720
+99 rows × 14 columns
+
+Step two: Expanding data frames
+Current data excl. key variables, notably output gap. So, let's address here:
+
+import pandas as pd
+xls  = pd.read_excel('C:/Users/ELyons/Group Project/Output gap.xlsx', sheet_name= 'UK Output Gap')
+xls
+Period	output gap
+0	1997-01-01	1.4
+1	1997-04-01	1.8
+2	1997-07-01	2.1
+3	1997-10-01	2.3
+4	1998-01-01	2.5
+...	...	...
+94	2020-07-01	-0.8
+95	2020-10-01	-0.8
+96	2021-01-01	0.4
+97	2021-04-01	NaN
+98	2021-07-01	NaN
+99 rows × 2 columns
+
+xls = xls.set_index('Period')
+Now, let's merge 'xls' with 'df' to produce 'df_final'
+
+df_final = df1.join(xls)
+df_final
+cgncr	cb	infl	rgdpgr_QoQ	household_consumption	savings_ratio	inactivity	unemployment	twhwgr	productivity	BoE_interest	eir	inv	total_gfcf	output gap
+period															
+1997-01-01	2.806258	0.279814	1.9	1.8	89.622529	9.6	23.6	7.4	0.877497	1.0	0.0	2.014332	15.101417	26.725449	1.4
+1997-04-01	3.823072	-0.436642	1.6	0.8	90.638018	12.7	23.4	7.1	0.526497	1.1	0.0	2.080403	15.416923	25.225364	1.8
+1997-07-01	0.694312	-0.042568	1.9	0.7	89.150955	7.3	23.6	7.1	0.216327	0.8	0.0	2.001686	15.656332	25.982576	2.1
+1997-10-01	-0.466053	-0.797533	1.8	1.2	89.852506	8.1	23.8	6.4	-0.045444	1.9	0.0	2.152766	16.894327	27.770416	2.3
+1998-01-01	-2.442600	-1.497500	1.6	0.7	89.719787	6.0	23.8	6.4	0.488747	2.2	0.0	2.068674	16.862334	28.478299	2.5
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+2020-07-01	13.367780	-1.534129	0.6	17.6	60.004461	12.7	21.0	5.1	8.588667	5.7	-3931.0	0.341278	9.087124	16.903118	-0.8
+2020-10-01	12.743945	-4.631994	0.5	1.5	56.504277	12.5	21.1	5.2	5.588844	1.4	-4052.0	0.224913	9.535715	17.408148	-0.8
+2021-01-01	3.703245	-2.030013	0.6	-1.3	54.854310	15.8	21.4	4.8	-1.939744	3.0	-4128.0	0.222175	8.412439	17.347942	0.4
+2021-04-01	12.840436	-2.354307	2.1	5.4	57.859787	13.9	21.1	4.5	5.355640	4.9	-4184.0	0.638025	8.895371	16.135802	NaN
+2021-07-01	4.209749	-4.178976	2.8	1.1	58.091594	7.7	21.1	4.4	2.526715	-4.5	-4096.0	0.483694	8.609265	16.197720	NaN
+99 rows × 15 columns
+
+df_final.rename(columns={'output gap':'o_gap'}, inplace=True)
+df_final = df_final.dropna(axis=0, how='any', thresh=None, inplace=False)
+df_final
+cgncr	cb	infl	rgdpgr_QoQ	household_consumption	savings_ratio	inactivity	unemployment	twhwgr	productivity	BoE_interest	eir	inv	total_gfcf	o_gap
+period															
+1997-01-01	2.806258	0.279814	1.9	1.8	89.622529	9.6	23.6	7.4	0.877497	1.0	0.0	2.014332	15.101417	26.725449	1.4
+1997-04-01	3.823072	-0.436642	1.6	0.8	90.638018	12.7	23.4	7.1	0.526497	1.1	0.0	2.080403	15.416923	25.225364	1.8
+1997-07-01	0.694312	-0.042568	1.9	0.7	89.150955	7.3	23.6	7.1	0.216327	0.8	0.0	2.001686	15.656332	25.982576	2.1
+1997-10-01	-0.466053	-0.797533	1.8	1.2	89.852506	8.1	23.8	6.4	-0.045444	1.9	0.0	2.152766	16.894327	27.770416	2.3
+1998-01-01	-2.442600	-1.497500	1.6	0.7	89.719787	6.0	23.8	6.4	0.488747	2.2	0.0	2.068674	16.862334	28.478299	2.5
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+2020-01-01	-0.379591	-2.596812	1.7	-2.6	59.571267	5.0	20.4	4.0	-1.742691	-0.1	-2870.0	0.360707	9.504062	17.455188	0.0
+2020-04-01	35.780901	-1.594494	0.6	-19.4	55.588450	26.6	20.9	4.0	-18.075208	-2.1	-3617.0	0.423791	9.028604	15.274615	0.0
+2020-07-01	13.367780	-1.534129	0.6	17.6	60.004461	12.7	21.0	5.1	8.588667	5.7	-3931.0	0.341278	9.087124	16.903118	-0.8
+2020-10-01	12.743945	-4.631994	0.5	1.5	56.504277	12.5	21.1	5.2	5.588844	1.4	-4052.0	0.224913	9.535715	17.408148	-0.8
+2021-01-01	3.703245	-2.030013	0.6	-1.3	54.854310	15.8	21.4	4.8	-1.939744	3.0	-4128.0	0.222175	8.412439	17.347942	0.4
+97 rows × 15 columns
+
+df_final.dtypes
+cgncr                    float64
+cb                       float64
+infl                     float64
+rgdpgr_QoQ               float64
+household_consumption    float64
+savings_ratio            float64
+inactivity               float64
+unemployment             float64
+twhwgr                   float64
+productivity             float64
+BoE_interest             float64
+eir                      float64
+inv                      float64
+total_gfcf               float64
+o_gap                    float64
+dtype: object
+Step three: Specifying the model
+Target Variable = cgnrc
+
+Predictors = All remaining variables in df_final
+
+The target variable:
+Let's first take a look at how CGNRC as a % of GDP has trended over time.
+
+from statsmodels.tsa.seasonal import seasonal_decompose
+​
+from pylab import rcParams
+rcParams['figure.figsize'] = 12,8
+​
+decomposed = seasonal_decompose(df_final['cgncr'], model='additive')
+fig = decomposed.plot()
+​
+
+As we have normalised the data by using GDP as a denominator, the trend is relatively stationary - excl. exogenous economic shocks such as the 2008 financial crisis and COVID-19. However, seasonality is still highly prevalent. [DOES ANYONE WANT TO ADD MORE ON THIS?]
+
+Moving onto the predictors:
+Let's first consider the relationship between predictors and target without making any adjustments:
+
+list(df_final)
+['cgncr',
+ 'cb',
+ 'infl',
+ 'rgdpgr_QoQ',
+ 'household_consumption',
+ 'savings_ratio',
+ 'inactivity',
+ 'unemployment',
+ 'twhwgr',
+ 'productivity',
+ 'BoE_interest',
+ 'eir',
+ 'inv',
+ 'total_gfcf',
+ 'o_gap']
+from sklearn.model_selection import train_test_split 
+import statsmodels.api as sm
+​
+​
+X = df_final[['cb',
+ 'infl',
+ 'rgdpgr_QoQ',
+ 'household_consumption',
+ 'savings_ratio',
+ 'inactivity',
+ 'unemployment',
+ 'twhwgr',
+ 'productivity',
+ 'BoE_interest',
+ 'eir',
+ 'inv',
+ 'total_gfcf',
+ 'o_gap']]
+​
+y = df_final[['cgncr']]
+​
+# Note issue with Train Test Split in that it randomises observations in the train and test sections. 
+# We need to keep the dates unbroken across train and test
+# Test on the last 10 years of the data (2011Q4 onwards)\n",
+​
+test_size = 40
+​
+X_train = X[:-test_size]
+X_test = X[-test_size:] 
+y_train = y[:-test_size]
+y_test = y[-test_size:]
+print(X_train)
+print(X_test)
+print(y_train)
+print(y_test)
+​
+                  cb  infl  rgdpgr_QoQ  household_consumption  savings_ratio  \
+period                                                                         
+1997-01-01  0.279814   1.9         1.8              89.622529            9.6   
+1997-04-01 -0.436642   1.6         0.8              90.638018           12.7   
+1997-07-01 -0.042568   1.9         0.7              89.150955            7.3   
+1997-10-01 -0.797533   1.8         1.2              89.852506            8.1   
+1998-01-01 -1.497500   1.6         0.7              89.719787            6.0   
+1998-04-01 -1.400668   1.8         0.7              90.395423           10.1   
+1998-07-01  0.488231   1.4         0.5              90.066907            4.2   
+1998-10-01 -0.288500   1.4         0.7              87.132114            5.2   
+1999-01-01 -3.277425   1.6         0.6              88.226998            0.0   
+1999-04-01 -2.521519   1.4         0.3              91.000733            8.5   
+1999-07-01 -2.612741   1.2         1.6              90.168540            4.4   
+1999-10-01 -1.672902   1.1         1.4              88.262084            7.0   
+2000-01-01 -2.110448   0.8         1.0              88.580838            4.7   
+2000-04-01 -2.240447   0.6         0.6              89.451198            9.3   
+2000-07-01 -2.352643   0.8         0.4              88.293177            5.0   
+2000-10-01 -2.044134   1.0         0.3              88.208343            8.0   
+2001-01-01 -1.393404   0.9         0.9              87.575746            6.9   
+2001-04-01 -2.418758   1.5         0.5              87.923548            9.5   
+2001-07-01 -2.290606   1.5         0.5              88.046356            5.4   
+2001-10-01 -1.776961   1.0         0.2              87.739140            5.9   
+2002-01-01 -2.137638   1.5         0.5              87.778809            5.6   
+2002-04-01 -3.114298   0.9         0.6              87.990440           10.4   
+2002-07-01 -1.507831   1.0         0.7              86.428521            5.7   
+2002-10-01 -1.697372   1.5         0.9              85.459792            5.4   
+2003-01-01 -0.634012   1.5         0.6              85.020430            6.6   
+2003-04-01 -2.198059   1.3         0.8              86.338688            7.5   
+2003-07-01 -2.590572   1.4         1.0              84.645236            3.9   
+2003-10-01 -1.739401   1.3         0.8              83.060015            4.8   
+2004-01-01 -2.567304   1.3         0.4              83.227564            5.7   
+2004-04-01 -2.638762   1.4         0.5              84.290378            8.3   
+2004-07-01 -3.072094   1.3         0.2              82.794409            4.7   
+2004-10-01 -1.044203   1.4         0.3              82.020996            4.8   
+2005-01-01 -2.131704   1.7         0.6              80.960136            5.6   
+2005-04-01 -0.487402   2.0         1.0              80.862014            8.8   
+2005-07-01 -2.608313   2.4         0.9              80.590539            4.6   
+2005-10-01 -2.399487   2.1         1.1              78.235766            5.1   
+2006-01-01 -2.692047   1.9         0.5              76.354023            6.2   
+2006-04-01 -2.684040   2.3         0.3              78.568069            7.6   
+2006-07-01 -3.106864   2.4         0.2              77.529550            4.8   
+2006-10-01 -2.751700   2.7         0.6              76.916029            6.5   
+2007-01-01 -3.290249   2.9         0.8              74.877101            8.1   
+2007-04-01 -2.723599   2.6         0.5              76.757480           10.8   
+2007-07-01 -4.059493   1.8         0.7              75.566998            7.0   
+2007-10-01 -3.472234   2.1         0.4              74.136040            5.2   
+2008-01-01 -3.413470   2.4         0.6              73.103211            4.8   
+2008-04-01 -4.192538   3.4        -0.5              74.258859            9.7   
+2008-07-01 -3.557221   4.8        -1.5              72.984636            5.3   
+2008-10-01 -4.319091   3.9        -2.0              71.285006            7.8   
+2009-01-01 -3.885706   3.0        -1.8              71.817908            6.6   
+2009-04-01 -4.071335   2.1        -0.3              73.071030           13.9   
+2009-07-01 -2.192897   1.5         0.1              72.512512           10.2   
+2009-10-01 -2.775916   2.1         0.3              73.135306           10.1   
+2010-01-01 -2.678349   3.3         0.7              70.405839           11.0   
+2010-04-01 -2.395553   3.5         1.1              72.320891           13.7   
+2010-07-01 -3.659689   3.1         0.7              71.778523            9.0   
+2010-10-01 -3.532367   3.4         0.1              70.829015            8.5   
+2011-01-01 -1.230012   4.1         0.5              68.296136            7.3   
+
+            inactivity  unemployment    twhwgr  productivity  BoE_interest  \
+period                                                                       
+1997-01-01        23.6           7.4  0.877497           1.0           0.0   
+1997-04-01        23.4           7.1  0.526497           1.1           0.0   
+1997-07-01        23.6           7.1  0.216327           0.8           0.0   
+1997-10-01        23.8           6.4 -0.045444           1.9           0.0   
+1998-01-01        23.8           6.4  0.488747           2.2           0.0   
+1998-04-01        23.9           6.2  0.000000           2.5           0.0   
+1998-07-01        23.6           6.5  0.395883           2.2           0.0   
+1998-10-01        23.5           6.0 -0.495719           2.4           0.0   
+1999-01-01        23.4           6.2  0.577446           2.2           0.0   
+1999-04-01        23.4           6.0  0.258922           1.8           0.0   
+1999-07-01        23.3           6.1  0.471592           2.7           0.0   
+1999-10-01        23.2           5.6  0.245865           2.3           0.0   
+2000-01-01        23.2           5.8 -1.404682           4.5           0.0   
+2000-04-01        23.3           5.4  1.232474           3.9           0.0   
+2000-07-01        23.2           5.5  0.078186           3.4           0.0   
+2000-10-01        23.5           5.1  0.825893           2.0           0.0   
+2001-01-01        23.4           5.1 -0.321010           0.7           0.0   
+2001-04-01        23.4           4.9  0.655192           0.8           0.0   
+2001-07-01        23.5           5.3 -0.165490           0.8           0.0   
+2001-10-01        23.4           5.0 -0.154713           1.7           0.0   
+2002-01-01        23.6           5.2 -0.221361           1.6           0.0   
+2002-04-01        23.3           5.0 -0.454798           2.8           0.0   
+2002-07-01        23.3           5.5  0.724315           2.1           0.0   
+2002-10-01        23.2           5.0  0.154884           2.2           0.0   
+2003-01-01        23.3           5.2 -0.077322           2.0           0.0   
+2003-04-01        23.3           4.8  0.287420           1.8           0.0   
+2003-07-01        23.3           5.3  0.121252           2.9           0.0   
+2003-10-01        23.5           4.8 -0.484421           3.4           0.0   
+2004-01-01        23.2           4.8  1.017812           1.8           0.0   
+2004-04-01        23.4           4.7 -0.361406           2.2           0.0   
+2004-07-01        23.5           4.9  0.230820           1.5           0.0   
+2004-10-01        23.3           4.6  1.217239          -0.4           0.0   
+2005-01-01        23.3           4.7  0.086674           0.8           0.0   
+2005-04-01        23.4           4.6 -0.097424           1.0           0.0   
+2005-07-01        23.3           4.9  0.715137           1.1           0.0   
+2005-10-01        23.3           5.0 -0.021517           3.2           0.0   
+2006-01-01        23.0           5.2  0.258259           2.9           0.0   
+2006-04-01        22.9           5.4 -0.128797           2.2           0.0   
+2006-07-01        22.9           5.7  0.139710           2.2           0.0   
+2006-10-01        23.0           5.4  0.407813           1.0           0.0   
+2007-01-01        23.2           5.5  0.160325           1.4           0.0   
+2007-04-01        23.2           5.3  0.437520           1.0           0.0   
+2007-07-01        23.2           5.5  0.201870           1.1           0.0   
+2007-10-01        23.1           5.0  0.000000           1.6           0.0   
+2008-01-01        23.0           5.2  1.272400           0.3           0.0   
+2008-04-01        22.9           5.3 -1.099361           0.8           0.0   
+2008-07-01        23.0           6.1  0.063519          -0.9           0.0   
+2008-10-01        22.9           6.2 -0.603047          -2.7           0.0   
+2009-01-01        22.8           7.1 -1.703034          -2.0         -17.0   
+2009-04-01        23.1           7.7 -0.368165          -2.9        -602.0   
+2009-07-01        23.3           8.1 -0.532551          -0.9       -1342.0   
+2009-10-01        23.4           7.6  0.043706           0.6       -1762.0   
+2010-01-01        23.6           8.0 -0.131062           1.6       -1910.0   
+2010-04-01        23.5           7.8  0.863955           2.1       -1926.0   
+2010-07-01        23.2           8.0  0.498753           1.8       -1950.0   
+2010-10-01        23.5           7.7  0.431546           1.2       -1954.0   
+2011-01-01        23.4           7.8  0.042969           0.6       -1890.0   
+
+                 eir        inv  total_gfcf  o_gap  
+period                                              
+1997-01-01  2.014332  15.101417   26.725449    1.4  
+1997-04-01  2.080403  15.416923   25.225364    1.8  
+1997-07-01  2.001686  15.656332   25.982576    2.1  
+1997-10-01  2.152766  16.894327   27.770416    2.3  
+1998-01-01  2.068674  16.862334   28.478299    2.5  
+1998-04-01  2.163189  16.177160   26.033996    2.5  
+1998-07-01  1.952314  15.776300   26.000814    2.0  
+1998-10-01  2.177897  16.619939   27.056290    1.0  
+1999-01-01  1.885925  16.215096   27.476666    0.6  
+1999-04-01  1.931212  15.573787   25.539192    0.8  
+1999-07-01  1.665157  15.841493   26.180762    1.9  
+1999-10-01  1.914869  15.952062   26.123754    2.1  
+2000-01-01  1.679944  15.907371   27.184753    2.1  
+2000-04-01  1.984647  16.581600   26.635153    1.2  
+2000-07-01  1.919951  14.787167   24.624672    1.0  
+2000-10-01  2.243503  16.006860   26.007181    1.2  
+2001-01-01  1.952560  15.426493   26.288961    1.2  
+2001-04-01  1.923779  15.419187   25.254881    1.4  
+2001-07-01  1.691526  14.683114   25.136317    0.5  
+2001-10-01  1.931023  14.679664   24.922958    0.2  
+2002-01-01  1.594992  14.079634   25.231663   -0.3  
+2002-04-01  1.799618  14.305420   24.273837   -0.1  
+2002-07-01  1.359181  13.866576   24.382046   -0.1  
+2002-10-01  1.838858  15.134353   26.293886   -0.7  
+2003-01-01  1.403824  14.422634   26.341470   -0.8  
+2003-04-01  1.670115  13.531232   23.516894   -0.6  
+2003-07-01  1.429299  13.050351   23.561240    0.4  
+2003-10-01  1.741480  13.280990   23.890196    0.9  
+2004-01-01  1.341297  12.924548   24.997930    1.1  
+2004-04-01  1.551914  12.129083   22.939553    0.8  
+2004-07-01  1.395532  12.104977   23.260485    0.9  
+2004-10-01  1.679487  12.562902   23.648926    0.9  
+2005-01-01  1.427887  11.730170   24.075276    0.8  
+2005-04-01  1.544870  18.505031   22.954565    0.6  
+2005-07-01  1.350156  12.447764   23.237408    0.5  
+2005-10-01  1.613226  12.623689   23.186707    0.3  
+2006-01-01  1.311523  11.955042   23.201280    0.2  
+2006-04-01  1.433390  12.157302   21.747863    0.1  
+2006-07-01  1.311250  12.697548   22.839737    0.0  
+2006-10-01  1.615862  12.918767   23.150286    0.5  
+2007-01-01  1.452103  12.349175   23.294494    0.9  
+2007-04-01  1.564868  13.053754   22.204255    1.7  
+2007-07-01  1.373123  12.231992   21.686988    1.7  
+2007-10-01  1.726911  13.428176   23.342505    1.4  
+2008-01-01  1.306305  11.501371   22.299586    1.2  
+2008-04-01  1.644040  12.094683   20.818415    0.7  
+2008-07-01  1.351736  11.863103   20.685493   -0.1  
+2008-10-01  1.412947  11.894928   21.001739   -2.0  
+2009-01-01  0.809682  10.382137   20.561053   -3.7  
+2009-04-01  0.972472  10.067790   17.854933   -4.1  
+2009-07-01  0.376056   9.913546   18.775383   -3.9  
+2009-10-01  0.944024  10.021336   18.811225   -3.6  
+2010-01-01  0.844365   9.805080   19.794065   -2.8  
+2010-04-01  1.044002   9.503490   17.519505   -2.1  
+2010-07-01  0.791373  10.094683   19.106708   -1.7  
+2010-10-01  1.010612  10.862180   19.700535   -1.6  
+2011-01-01  0.863661   9.363082   18.946948   -1.2  
+                  cb  infl  rgdpgr_QoQ  household_consumption  savings_ratio  \
+period                                                                         
+2011-04-01 -1.396879   4.4         0.1              69.825366           12.1   
+2011-07-01 -2.878564   4.7         0.3              69.002088            8.1   
+2011-10-01 -2.110961   4.6         0.1              67.927412            7.1   
+2012-01-01 -2.477263   3.5         0.7              67.188951            8.6   
+2012-04-01 -4.234726   2.8        -0.1              68.917205           12.1   
+2012-07-01 -3.230444   2.4         1.2              68.033491            7.2   
+2012-10-01 -3.969217   2.7        -0.2              67.481688            5.2   
+2013-01-01 -4.618796   2.8         0.5              66.807130            5.4   
+2013-04-01 -4.008112   2.7         0.7              67.541508           10.8   
+2013-07-01 -4.764577   2.7         0.8              67.612994            6.5   
+2013-10-01 -5.651000   2.1         0.5              65.690543            7.6   
+2014-01-01 -4.472511   1.7         0.9              65.076944            9.1   
+2014-04-01 -4.118072   1.7         0.8              66.019290           11.2   
+2014-07-01 -5.180614   1.5         0.7              66.526550            6.1   
+2014-10-01 -6.638223   0.9         0.6              65.360880            5.5   
+2015-01-01 -5.976368   0.1         0.6              65.720872            7.0   
+2015-04-01 -3.579324   0.0         0.7              66.171680           12.1   
+2015-07-01 -4.595629   0.0         0.5              67.176092            8.7   
+2015-10-01 -6.481051   0.1         0.7              65.077280            8.8   
+2016-01-01 -5.742810   0.3         0.4              65.997224            7.1   
+2016-04-01 -5.240683   0.4         0.6              66.059691           10.5   
+2016-07-01 -6.241748   0.7         0.4              66.722328            4.5   
+2016-10-01 -4.122639   1.2         0.7              64.710555            2.5   
+2017-01-01 -3.224587   2.1         0.6              64.597095            2.1   
+2017-04-01 -4.616690   2.7         0.3              64.892563            8.4   
+2017-07-01 -3.649050   2.8         0.4              64.834487            4.2   
+2017-10-01 -3.060318   3.0         0.4              63.007281            3.8   
+2018-01-01 -3.990405   2.7         0.2              63.864025            3.4   
+2018-04-01 -3.715133   2.4         0.5              63.825343            8.2   
+2018-07-01 -3.751230   2.5         0.6              63.631255            3.7   
+2018-10-01 -4.048118   2.3         0.3              62.127099            4.4   
+2019-01-01 -5.800442   1.9         0.6              61.945174            3.2   
+2019-04-01 -2.908939   2.0         0.1              63.223739            7.9   
+2019-07-01 -2.541884   1.8         0.5              62.027613            3.2   
+2019-10-01  0.488440   1.4         0.0              60.188232            5.2   
+2020-01-01 -2.596812   1.7        -2.6              59.571267            5.0   
+2020-04-01 -1.594494   0.6       -19.4              55.588450           26.6   
+2020-07-01 -1.534129   0.6        17.6              60.004461           12.7   
+2020-10-01 -4.631994   0.5         1.5              56.504277           12.5   
+2021-01-01 -2.030013   0.6        -1.3              54.854310           15.8   
+
+            inactivity  unemployment     twhwgr  productivity  BoE_interest  \
+period                                                                        
+2011-04-01        23.3           7.8  -1.063030           1.5       -1934.0   
+2011-07-01        23.4           8.6   0.607771           1.1       -1956.0   
+2011-10-01        23.2           8.3  -0.107875           1.9       -2230.0   
+2012-01-01        23.1           8.2   0.961123           1.3       -2630.0   
+2012-04-01        22.8           7.9   0.684565          -0.7       -2832.0   
+2012-07-01        22.7           8.1   1.009243          -0.4       -2894.0   
+2012-10-01        22.4           7.7   0.305006          -1.4       -3145.0   
+2013-01-01        22.6           7.8   0.083884          -0.9       -3187.0   
+2013-04-01        22.5           7.7   0.272394           0.3       -3165.0   
+2013-07-01        22.3           7.8   1.180650          -0.3       -3154.0   
+2013-10-01        22.3           7.1   0.175547           0.8       -3123.0   
+2014-01-01        22.2           6.7   0.907123           0.8       -3123.0   
+2014-04-01        22.2           6.2   0.970477          -0.2       -3140.0   
+2014-07-01        22.2           6.2   0.323756           0.5       -3099.0   
+2014-10-01        22.3           5.6   0.594998          -0.2       -3081.0   
+2015-01-01        22.1           5.5   0.280702           0.2       -3078.0   
+2015-04-01        22.1           5.5  -0.129961           1.3       -3083.0   
+2015-07-01        22.0           5.5   0.030030           1.6       -2718.0   
+2015-10-01        21.8           4.9   1.971380           0.5       -3024.0   
+2016-01-01        21.8           5.1  -0.500491           1.0       -2879.0   
+2016-04-01        21.6           4.9   0.256436           0.6       -2992.0   
+2016-07-01        21.7           5.0   0.236104           0.4       -3196.0   
+2016-10-01        21.6           4.6   0.392580           2.0       -3369.0   
+2017-01-01        21.6           4.6   0.625672           1.0       -3478.0   
+2017-04-01        21.3           4.4   0.534344           0.5       -3498.0   
+2017-07-01        21.6           4.5  -0.995361           1.6       -3445.0   
+2017-10-01        21.3           4.2   0.234261           1.4       -3192.0   
+2018-01-01        21.1           4.2   0.486902           0.8       -3031.0   
+2018-04-01        21.2           4.0   0.164745           1.5       -2934.0   
+2018-07-01        21.1           4.3   0.880418           0.0       -2706.0   
+2018-10-01        20.9           3.9  -0.067133           0.5       -2593.0   
+2019-01-01        20.8           3.8   1.046065           0.5       -2729.0   
+2019-04-01        20.7           3.8  -0.028493           0.2       -2718.0   
+2019-07-01        20.8           4.0   0.000000           0.7       -2711.0   
+2019-10-01        20.5           3.7  -0.237507           0.3       -2670.0   
+2020-01-01        20.4           4.0  -1.742691          -0.1       -2870.0   
+2020-04-01        20.9           4.0 -18.075208          -2.1       -3617.0   
+2020-07-01        21.0           5.1   8.588667           5.7       -3931.0   
+2020-10-01        21.1           5.2   5.588844           1.4       -4052.0   
+2021-01-01        21.4           4.8  -1.939744           3.0       -4128.0   
+
+                 eir        inv  total_gfcf  o_gap  
+period                                              
+2011-04-01  1.071397   9.889833   17.312646   -1.4  
+2011-07-01  0.787375  10.420656   18.579841   -1.6  
+2011-10-01  1.027274  10.943701   19.074826   -1.9  
+2012-01-01  0.610766  10.406507   19.416090   -1.4  
+2012-04-01  0.926241   9.920071   17.128590   -1.9  
+2012-07-01  0.534398  10.147715   17.487923   -1.2  
+2012-10-01  0.846358  11.162639   18.752688   -1.7  
+2013-01-01  0.597367   9.863353   18.120189   -1.5  
+2013-04-01  0.843137  10.166438   17.360420   -1.6  
+2013-07-01  0.518152  10.431806   18.175558   -1.5  
+2013-10-01  0.736680  10.823668   18.516911   -1.6  
+2014-01-01  0.531637   9.938295   18.862997   -1.2  
+2014-04-01  0.750468  10.437469   17.566928   -0.9  
+2014-07-01  0.536987  10.433178   18.311274   -0.6  
+2014-10-01  0.652996  11.053775   18.950378   -0.3  
+2015-01-01  0.297653  10.781766   19.528819   -0.5  
+2015-04-01  0.676741  10.796564   18.263549   -0.3  
+2015-07-01  0.501382  10.813392   18.605115   -0.3  
+2015-10-01  0.560307  11.956537   19.579177   -0.1  
+2016-01-01  0.416030  10.990768   19.461086   -0.6  
+2016-04-01  0.668656  11.370759   18.652070   -0.5  
+2016-07-01  0.572467  11.400693   19.294510   -0.4  
+2016-10-01  0.546159  11.168042   18.962208    0.0  
+2017-01-01  0.438761  10.591261   19.254256    0.0  
+2017-04-01  0.777285  10.857741   18.480670    0.0  
+2017-07-01  0.551257  10.860291   18.933591    0.1  
+2017-10-01  0.640838  11.223272   19.174562    0.2  
+2018-01-01  0.469020  10.064497   18.587043    0.1  
+2018-04-01  0.675959   9.902985   17.384498    0.2  
+2018-07-01  0.542284  10.319981   18.412917    0.3  
+2018-10-01  0.650271  10.851837   18.708843    0.2  
+2019-01-01  0.297524  10.143688   18.764227    0.3  
+2019-04-01  0.805141   9.790043   16.974797    0.1  
+2019-07-01  0.444257  10.225056   17.864555    0.1  
+2019-10-01  0.482594   9.900405   17.274515    0.0  
+2020-01-01  0.360707   9.504062   17.455188    0.0  
+2020-04-01  0.423791   9.028604   15.274615    0.0  
+2020-07-01  0.341278   9.087124   16.903118   -0.8  
+2020-10-01  0.224913   9.535715   17.408148   -0.8  
+2021-01-01  0.222175   8.412439   17.347942    0.4  
+                cgncr
+period               
+1997-01-01   2.806258
+1997-04-01   3.823072
+1997-07-01   0.694312
+1997-10-01  -0.466053
+1998-01-01  -2.442600
+1998-04-01   2.654218
+1998-07-01  -0.582444
+1998-10-01  -1.526534
+1999-01-01  -2.191795
+1999-04-01   1.893882
+1999-07-01  -0.835601
+1999-10-01   0.973155
+2000-01-01  -5.317841
+2000-04-01  -4.162309
+2000-07-01  -5.861726
+2000-10-01   1.534616
+2001-01-01  -4.385031
+2001-04-01   2.214217
+2001-07-01  -1.909653
+2001-10-01   3.069955
+2002-01-01  -2.369900
+2002-04-01   2.528041
+2002-07-01   0.693229
+2002-10-01   4.840847
+2003-01-01  -0.815250
+2003-04-01   5.637554
+2003-07-01   2.006266
+2003-10-01   5.053103
+2004-01-01  -0.230659
+2004-04-01   4.426419
+2004-07-01   2.389908
+2004-10-01   6.944629
+2005-01-01  -1.382014
+2005-04-01   5.679202
+2005-07-01   2.466155
+2005-10-01   5.359132
+2006-01-01  -1.210987
+2006-04-01   6.460840
+2006-07-01   1.975552
+2006-10-01   3.789846
+2007-01-01  -1.934024
+2007-04-01   4.653199
+2007-07-01   0.904073
+2007-10-01   5.216170
+2008-01-01  -2.112913
+2008-04-01   7.770711
+2008-07-01   9.458093
+2008-10-01  16.839697
+2009-01-01   7.262339
+2009-04-01  14.096838
+2009-07-01   9.544601
+2009-10-01  19.673059
+2010-01-01   7.521456
+2010-04-01  12.614575
+2010-07-01   6.656649
+2010-10-01  10.604904
+2011-01-01   3.200649
+                cgncr
+period               
+2011-04-01   9.774241
+2011-07-01   6.415939
+2011-10-01   7.204729
+2012-01-01   4.755265
+2012-04-01   6.350192
+2012-07-01   6.073718
+2012-10-01   8.689587
+2013-01-01   1.070862
+2013-04-01   6.501962
+2013-07-01   3.208359
+2013-10-01   5.445691
+2014-01-01   2.188452
+2014-04-01   7.479211
+2014-07-01   4.348478
+2014-10-01   5.129593
+2015-01-01   1.043827
+2015-04-01   5.894343
+2015-07-01   3.733689
+2015-10-01   3.607893
+2016-01-01  -0.677409
+2016-04-01   5.439613
+2016-07-01   5.714828
+2016-10-01   4.776309
+2017-01-01  -2.609338
+2017-04-01   2.312982
+2017-07-01   2.484521
+2017-10-01   4.432332
+2018-01-01  -1.892157
+2018-04-01   2.622173
+2018-07-01   0.984926
+2018-10-01   3.771878
+2019-01-01  -1.015848
+2019-04-01   4.147895
+2019-07-01   1.818269
+2019-10-01   4.334060
+2020-01-01  -0.379591
+2020-04-01  35.780901
+2020-07-01  13.367780
+2020-10-01  12.743945
+2021-01-01   3.703245
+model = sm.OLS(y_train, X_train)
+results = model.fit()
+​
+print(results.summary())
+                            OLS Regression Results                            
+==============================================================================
+Dep. Variable:                  cgncr   R-squared:                       0.748
+Model:                            OLS   Adj. R-squared:                  0.676
+Method:                 Least Squares   F-statistic:                     10.40
+Date:                Tue, 25 Jan 2022   Prob (F-statistic):           2.67e-10
+Time:                        11:48:21   Log-Likelihood:                -142.69
+No. Observations:                  64   AIC:                             315.4
+Df Residuals:                      49   BIC:                             347.8
+Df Model:                          14                                         
+Covariance Type:            nonrobust                                         
+=========================================================================================
+                            coef    std err          t      P>|t|      [0.025      0.975]
+-----------------------------------------------------------------------------------------
+const                   -23.6567     26.343     -0.898      0.374     -76.595      29.281
+cb                        0.2988      0.314      0.951      0.346      -0.332       0.930
+infl                     -0.4642      0.566     -0.820      0.416      -1.602       0.673
+rgdpgr_QoQ                0.6458      0.469      1.376      0.175      -0.297       1.589
+household_consumption    -0.4169      0.175     -2.377      0.021      -0.769      -0.065
+savings_ratio             0.0955      0.160      0.597      0.553      -0.226       0.417
+inactivity                3.8984      1.490      2.616      0.012       0.903       6.894
+unemployment             -1.0695      0.697     -1.535      0.131      -2.470       0.331
+twhwgr                    0.0005      0.781      0.001      1.000      -1.568       1.569
+productivity             -0.5398      0.382     -1.413      0.164      -1.308       0.228
+BoE_interest              0.0009      0.001      1.100      0.277      -0.001       0.003
+eir                       6.0170      2.999      2.006      0.050      -0.010      12.044
+inv                       1.4862      0.900      1.651      0.105      -0.323       3.296
+total_gfcf               -2.1751      0.609     -3.572      0.001      -3.399      -0.951
+o_gap                    -1.7016      0.477     -3.571      0.001      -2.659      -0.744
+==============================================================================
+Omnibus:                        4.423   Durbin-Watson:                   1.778
+Prob(Omnibus):                  0.110   Jarque-Bera (JB):                5.383
+Skew:                           0.004   Prob(JB):                       0.0678
+Kurtosis:                       4.421   Cond. No.                     1.66e+05
+==============================================================================
+
+Notes:
+[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+[2] The condition number is large, 1.66e+05. This might indicate that there are
+strong multicollinearity or other numerical problems.
+Interpreting these results: Preliminary
+The R squared shows us what proportion/fraction of variance in y is shared with variance in x. In this case, this model explains 74.8% of the variation in data.
+
+Our std error is an estimate of the standard deviation of the coefficient, a measurement of the amount of variation in the coefficient throughout its data points. This is relatively small across the period.
+
+Infl, household_consumption, unemployment, productivity, total_gfcf and o_gap negatively impact on cgncr. [This seems bizarre. I think COVID may be skewing results]
+
+Only total_gcfc and o_gap are significant at the 99% level; and eir, inactivity and household_consumption are significant at the 95% level.
+
+The condition number is large, whuch might indicate strong multicollinearity and reduce the scope to test the relative importance of each independent predictor.
+
+Dealing with lags:
+Due to the likely interdepency of each x in t with x in t-i, we must specify a model that accounts for these temporal lags before any regression analysis can be undertaken.
+
+We have applied four lags to each predictor in this model.
+
+list(df_final)
+['cgncr',
+ 'cb',
+ 'infl',
+ 'rgdpgr_QoQ',
+ 'household_consumption',
+ 'savings_ratio',
+ 'inactivity',
+ 'unemployment',
+ 'twhwgr',
+ 'productivity',
+ 'BoE_interest',
+ 'eir',
+ 'inv',
+ 'total_gfcf',
+ 'o_gap']
+X = pd.DataFrame(df_final['cgncr'])
+​
+X['cgncr_lag1'] = df_final['cgncr'].shift(1)
+X['cgncr_lag2'] = df_final['cgncr'].shift(2)
+X['cgncr_lag3'] = df_final['cgncr'].shift(3)
+X['cgncr_lag4'] = df_final['cgncr'].shift(4)
+​
+X1 = pd.DataFrame(df_final['cb'])
+​
+X1['cb_lag1'] = df_final['cb'].shift(1)
+X1['cb_lag2'] = df_final['cb'].shift(2)
+X1['cb_lag3'] = df_final['cb'].shift(3)
+X1['cb_lag4'] = df_final['cb'].shift(4)
+​
+X2 = pd.DataFrame(df_final['infl'])
+X2['infl_lag1'] = df_final['infl'].shift(1)
+X2['infl_lag2'] = df_final['infl'].shift(2)
+X2['infl_lag3'] = df_final['infl'].shift(3)
+X2['infl_lag4'] = df_final['infl'].shift(4)
+​
+X3 = pd.DataFrame(df_final['household_consumption'])
+X3['household_consumption_lag1'] = df_final['household_consumption'].shift(1)
+X3['household_consumption_lag2'] = df_final['household_consumption'].shift(2)
+X3['household_consumption_lag3'] = df_final['household_consumption'].shift(3)
+X3['household_consumption_lag4'] = df_final['household_consumption'].shift(4)
+​
+X4 = pd.DataFrame(df_final['savings_ratio'])
+X4['savings_ratio_lag1'] = df_final['savings_ratio'].shift(1)
+X4['savings_ratio_lag2'] = df_final['savings_ratio'].shift(2)
+X4['savings_ratio_lag3'] = df_final['savings_ratio'].shift(3)
+X4['savings_ratio_lag4'] = df_final['savings_ratio'].shift(4)
+​
+X5 = pd.DataFrame(df_final['inactivity'])
+X5['inactivity_lag1'] = df_final['inactivity'].shift(1)
+X5['inactivity_lag2'] = df_final['inactivity'].shift(2)
+X5['inactivity_lag3'] = df_final['inactivity'].shift(3)
+X5['inactivity_lag4'] = df_final['inactivity'].shift(4)
+​
+X6 = pd.DataFrame(df_final['unemployment'])
+X6['unemployment_lag1'] = df_final['unemployment'].shift(1)
+X6['unemployment_lag2'] = df_final['unemployment'].shift(2)
+X6['unemployment_lag3'] = df_final['unemployment'].shift(3)
+X6['unemployment_lag4'] = df_final['unemployment'].shift(4)
+​
+X7 = pd.DataFrame(df_final['twhwgr'])
+X7['twhwgr_lag1'] = df_final['twhwgr'].shift(1)
+X7['twhwgr_lag2'] = df_final['twhwgr'].shift(2)
+X7['twhwgr_lag3'] = df_final['twhwgr'].shift(3)
+X7['twhwgr_lag4'] = df_final['twhwgr'].shift(4)
+​
+X8 = pd.DataFrame(df_final['productivity'])
+X8['productivity_lag1'] = df_final['productivity'].shift(1)
+X8['productivity_lag2'] = df_final['productivity'].shift(2)
+X8['productivity_lag3'] = df_final['productivity'].shift(3)
+X8['productivity_lag4'] = df_final['productivity'].shift(4)
+​
+X9 = pd.DataFrame(df_final['BoE_interest'])
+X9['BoE_interest_lag1'] = df_final['BoE_interest'].shift(1)
+X9['BoE_interest_lag2'] = df_final['BoE_interest'].shift(2)
+X9['BoE_interest_lag3'] = df_final['BoE_interest'].shift(3)
+X9['BoE_interest_lag4'] = df_final['BoE_interest'].shift(4)
+​
+X10 = pd.DataFrame(df_final['eir'])
+X10['eir_lag1'] = df_final['eir'].shift(1)
+X10['eir_lag2'] = df_final['eir'].shift(2)
+X10['eir_lag3'] = df_final['eir'].shift(3)
+X10['eir_lag4'] = df_final['eir'].shift(4)
+​
+X11 = pd.DataFrame(df_final['inv'])
+X11['inv_lag1'] = df_final['inv'].shift(1)
+X11['inv_lag2'] = df_final['inv'].shift(2)
+X11['inv_lag3'] = df_final['inv'].shift(3)
+X11['inv_lag4'] = df_final['inv'].shift(4)
+​
+​
+X12 = pd.DataFrame(df_final['total_gfcf'])
+X12['total_gfcf_lag1'] = df_final['total_gfcf'].shift(1)
+X12['total_gfcf_lag2'] = df_final['total_gfcf'].shift(2)
+X12['total_gfcf_lag3'] = df_final['total_gfcf'].shift(3)
+X12['total_gfcf_lag4'] = df_final['total_gfcf'].shift(4)
+​
+​
+X13 = pd.DataFrame(df_final['o_gap'])
+X13['o_gap_lag1'] = df_final['o_gap'].shift(1)
+X13['o_gap_lag2'] = df_final['o_gap'].shift(2)
+X13['o_gap_lag3'] = df_final['o_gap'].shift(3)
+X13['o_gap_lag4'] = df_final['o_gap'].shift(4)
+​
+​
+X14 = pd.DataFrame(df_final['rgdpgr_QoQ'])
+X14['rgdpgr_QoQ_lag1'] = df_final['rgdpgr_QoQ'].shift(1)
+X14['rgdpgr_QoQ_lag2'] = df_final['rgdpgr_QoQ'].shift(2)
+X14['rgdpgr_QoQ_lag3'] = df_final['rgdpgr_QoQ'].shift(3)
+X14['rgdpgr_QoQ_lag4'] = df_final['rgdpgr_QoQ'].shift(4)
+​
+# For example:
+X2
+infl	infl_lag1	infl_lag2	infl_lag3	infl_lag4
+period					
+1997-01-01	1.9	NaN	NaN	NaN	NaN
+1997-04-01	1.6	1.9	NaN	NaN	NaN
+1997-07-01	1.9	1.6	1.9	NaN	NaN
+1997-10-01	1.8	1.9	1.6	1.9	NaN
+1998-01-01	1.6	1.8	1.9	1.6	1.9
+...	...	...	...	...	...
+2020-01-01	1.7	1.4	1.8	2.0	1.9
+2020-04-01	0.6	1.7	1.4	1.8	2.0
+2020-07-01	0.6	0.6	1.7	1.4	1.8
+2020-10-01	0.5	0.6	0.6	1.7	1.4
+2021-01-01	0.6	0.5	0.6	0.6	1.7
+97 rows × 5 columns
+
+df_lag = pd.concat([X, X1,X2, X3, X4, X5, X6, X7, X8, X9, X10, X11, X12, X13,X14], axis=1)
+df_lag
+cgncr	cgncr_lag1	cgncr_lag2	cgncr_lag3	cgncr_lag4	cb	cb_lag1	cb_lag2	cb_lag3	cb_lag4	...	o_gap	o_gap_lag1	o_gap_lag2	o_gap_lag3	o_gap_lag4	rgdpgr_QoQ	rgdpgr_QoQ_lag1	rgdpgr_QoQ_lag2	rgdpgr_QoQ_lag3	rgdpgr_QoQ_lag4
+period																					
+1997-01-01	2.806258	NaN	NaN	NaN	NaN	0.279814	NaN	NaN	NaN	NaN	...	1.4	NaN	NaN	NaN	NaN	1.8	NaN	NaN	NaN	NaN
+1997-04-01	3.823072	2.806258	NaN	NaN	NaN	-0.436642	0.279814	NaN	NaN	NaN	...	1.8	1.4	NaN	NaN	NaN	0.8	1.8	NaN	NaN	NaN
+1997-07-01	0.694312	3.823072	2.806258	NaN	NaN	-0.042568	-0.436642	0.279814	NaN	NaN	...	2.1	1.8	1.4	NaN	NaN	0.7	0.8	1.8	NaN	NaN
+1997-10-01	-0.466053	0.694312	3.823072	2.806258	NaN	-0.797533	-0.042568	-0.436642	0.279814	NaN	...	2.3	2.1	1.8	1.4	NaN	1.2	0.7	0.8	1.8	NaN
+1998-01-01	-2.442600	-0.466053	0.694312	3.823072	2.806258	-1.497500	-0.797533	-0.042568	-0.436642	0.279814	...	2.5	2.3	2.1	1.8	1.4	0.7	1.2	0.7	0.8	1.8
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+2020-01-01	-0.379591	4.334060	1.818269	4.147895	-1.015848	-2.596812	0.488440	-2.541884	-2.908939	-5.800442	...	0.0	0.0	0.1	0.1	0.3	-2.6	0.0	0.5	0.1	0.6
+2020-04-01	35.780901	-0.379591	4.334060	1.818269	4.147895	-1.594494	-2.596812	0.488440	-2.541884	-2.908939	...	0.0	0.0	0.0	0.1	0.1	-19.4	-2.6	0.0	0.5	0.1
+2020-07-01	13.367780	35.780901	-0.379591	4.334060	1.818269	-1.534129	-1.594494	-2.596812	0.488440	-2.541884	...	-0.8	0.0	0.0	0.0	0.1	17.6	-19.4	-2.6	0.0	0.5
+2020-10-01	12.743945	13.367780	35.780901	-0.379591	4.334060	-4.631994	-1.534129	-1.594494	-2.596812	0.488440	...	-0.8	-0.8	0.0	0.0	0.0	1.5	17.6	-19.4	-2.6	0.0
+2021-01-01	3.703245	12.743945	13.367780	35.780901	-0.379591	-2.030013	-4.631994	-1.534129	-1.594494	-2.596812	...	0.4	-0.8	-0.8	0.0	0.0	-1.3	1.5	17.6	-19.4	-2.6
+97 rows × 75 columns
+
+Now, let's remove NaN's caused by introducing lags:
+
+df_lag1 = df_lag.dropna(axis=0, how='any', thresh=None, inplace=False)
+df_lag1
+cgncr	cgncr_lag1	cgncr_lag2	cgncr_lag3	cgncr_lag4	cb	cb_lag1	cb_lag2	cb_lag3	cb_lag4	...	o_gap	o_gap_lag1	o_gap_lag2	o_gap_lag3	o_gap_lag4	rgdpgr_QoQ	rgdpgr_QoQ_lag1	rgdpgr_QoQ_lag2	rgdpgr_QoQ_lag3	rgdpgr_QoQ_lag4
+period																					
+1998-01-01	-2.442600	-0.466053	0.694312	3.823072	2.806258	-1.497500	-0.797533	-0.042568	-0.436642	0.279814	...	2.5	2.3	2.1	1.8	1.4	0.7	1.2	0.7	0.8	1.8
+1998-04-01	2.654218	-2.442600	-0.466053	0.694312	3.823072	-1.400668	-1.497500	-0.797533	-0.042568	-0.436642	...	2.5	2.5	2.3	2.1	1.8	0.7	0.7	1.2	0.7	0.8
+1998-07-01	-0.582444	2.654218	-2.442600	-0.466053	0.694312	0.488231	-1.400668	-1.497500	-0.797533	-0.042568	...	2.0	2.5	2.5	2.3	2.1	0.5	0.7	0.7	1.2	0.7
+1998-10-01	-1.526534	-0.582444	2.654218	-2.442600	-0.466053	-0.288500	0.488231	-1.400668	-1.497500	-0.797533	...	1.0	2.0	2.5	2.5	2.3	0.7	0.5	0.7	0.7	1.2
+1999-01-01	-2.191795	-1.526534	-0.582444	2.654218	-2.442600	-3.277425	-0.288500	0.488231	-1.400668	-1.497500	...	0.6	1.0	2.0	2.5	2.5	0.6	0.7	0.5	0.7	0.7
+...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...	...
+2020-01-01	-0.379591	4.334060	1.818269	4.147895	-1.015848	-2.596812	0.488440	-2.541884	-2.908939	-5.800442	...	0.0	0.0	0.1	0.1	0.3	-2.6	0.0	0.5	0.1	0.6
+2020-04-01	35.780901	-0.379591	4.334060	1.818269	4.147895	-1.594494	-2.596812	0.488440	-2.541884	-2.908939	...	0.0	0.0	0.0	0.1	0.1	-19.4	-2.6	0.0	0.5	0.1
+2020-07-01	13.367780	35.780901	-0.379591	4.334060	1.818269	-1.534129	-1.594494	-2.596812	0.488440	-2.541884	...	-0.8	0.0	0.0	0.0	0.1	17.6	-19.4	-2.6	0.0	0.5
+2020-10-01	12.743945	13.367780	35.780901	-0.379591	4.334060	-4.631994	-1.534129	-1.594494	-2.596812	0.488440	...	-0.8	-0.8	0.0	0.0	0.0	1.5	17.6	-19.4	-2.6	0.0
+2021-01-01	3.703245	12.743945	13.367780	35.780901	-0.379591	-2.030013	-4.631994	-1.534129	-1.594494	-2.596812	...	0.4	-0.8	-0.8	0.0	0.0	-1.3	1.5	17.6	-19.4	-2.6
+93 rows × 75 columns
+
+Specifying the lagged model
+list(df_lag1)
+['cgncr',
+ 'cgncr_lag1',
+ 'cgncr_lag2',
+ 'cgncr_lag3',
+ 'cgncr_lag4',
+ 'cb',
+ 'cb_lag1',
+ 'cb_lag2',
+ 'cb_lag3',
+ 'cb_lag4',
+ 'infl',
+ 'infl_lag1',
+ 'infl_lag2',
+ 'infl_lag3',
+ 'infl_lag4',
+ 'household_consumption',
+ 'household_consumption_lag1',
+ 'household_consumption_lag2',
+ 'household_consumption_lag3',
+ 'household_consumption_lag4',
+ 'savings_ratio',
+ 'savings_ratio_lag1',
+ 'savings_ratio_lag2',
+ 'savings_ratio_lag3',
+ 'savings_ratio_lag4',
+ 'inactivity',
+ 'inactivity_lag1',
+ 'inactivity_lag2',
+ 'inactivity_lag3',
+ 'inactivity_lag4',
+ 'unemployment',
+ 'unemployment_lag1',
+ 'unemployment_lag2',
+ 'unemployment_lag3',
+ 'unemployment_lag4',
+ 'twhwgr',
+ 'twhwgr_lag1',
+ 'twhwgr_lag2',
+ 'twhwgr_lag3',
+ 'twhwgr_lag4',
+ 'productivity',
+ 'productivity_lag1',
+ 'productivity_lag2',
+ 'productivity_lag3',
+ 'productivity_lag4',
+ 'BoE_interest',
+ 'BoE_interest_lag1',
+ 'BoE_interest_lag2',
+ 'BoE_interest_lag3',
+ 'BoE_interest_lag4',
+ 'eir',
+ 'eir_lag1',
+ 'eir_lag2',
+ 'eir_lag3',
+ 'eir_lag4',
+ 'inv',
+ 'inv_lag1',
+ 'inv_lag2',
+ 'inv_lag3',
+ 'inv_lag4',
+ 'total_gfcf',
+ 'total_gfcf_lag1',
+ 'total_gfcf_lag2',
+ 'total_gfcf_lag3',
+ 'total_gfcf_lag4',
+ 'o_gap',
+ 'o_gap_lag1',
+ 'o_gap_lag2',
+ 'o_gap_lag3',
+ 'o_gap_lag4',
+ 'rgdpgr_QoQ',
+ 'rgdpgr_QoQ_lag1',
+ 'rgdpgr_QoQ_lag2',
+ 'rgdpgr_QoQ_lag3',
+ 'rgdpgr_QoQ_lag4']
+X = df_lag1[[ 'cb',
+ 'cb_lag1',
+ 'cb_lag2',
+ 'cb_lag3',
+ 'cb_lag4',
+ 'infl',
+ 'infl_lag1',
+ 'infl_lag2',
+ 'infl_lag3',
+ 'infl_lag4',
+ 'household_consumption',
+ 'household_consumption_lag1',
+ 'household_consumption_lag2',
+ 'household_consumption_lag3',
+ 'household_consumption_lag4',
+ 'savings_ratio',
+ 'savings_ratio_lag1',
+ 'savings_ratio_lag2',
+ 'savings_ratio_lag3',
+ 'savings_ratio_lag4',
+ 'inactivity',
+ 'inactivity_lag1',
+ 'inactivity_lag2',
+ 'inactivity_lag3',
+ 'inactivity_lag4',
+ 'unemployment',
+ 'unemployment_lag1',
+ 'unemployment_lag2',
+ 'unemployment_lag3',
+ 'unemployment_lag4',
+ 'twhwgr',
+ 'twhwgr_lag1',
+ 'twhwgr_lag2',
+ 'twhwgr_lag3',
+ 'twhwgr_lag4',
+ 'productivity',
+ 'productivity_lag1',
+ 'productivity_lag2',
+ 'productivity_lag3',
+ 'productivity_lag4',
+ 'BoE_interest',
+ 'BoE_interest_lag1',
+ 'BoE_interest_lag2',
+ 'BoE_interest_lag3',
+ 'BoE_interest_lag4',
+ 'eir',
+ 'eir_lag1',
+ 'eir_lag2',
+ 'eir_lag3',
+ 'eir_lag4',
+ 'inv',
+ 'inv_lag1',
+ 'inv_lag2',
+ 'inv_lag3',
+ 'inv_lag4',
+ 'total_gfcf',
+ 'total_gfcf_lag1',
+ 'total_gfcf_lag2',
+ 'total_gfcf_lag3',
+ 'total_gfcf_lag4',
+ 'o_gap',
+ 'o_gap_lag1',
+ 'o_gap_lag2',
+ 'o_gap_lag3',
+ 'o_gap_lag4',
+ 'rgdpgr_QoQ',
+ 'rgdpgr_QoQ_lag1',
+ 'rgdpgr_QoQ_lag2',
+ 'rgdpgr_QoQ_lag3',
+ 'rgdpgr_QoQ_lag4']]
+
+y = df_lag1[['cgncr',
+ 'cgncr_lag1',
+ 'cgncr_lag2',
+ 'cgncr_lag3',
+ 'cgncr_lag4']]
+
+# Note issue with Train Test Split in that it randomises observations in the train and test sections. 
+# We need to keep the dates unbroken across train and test
+# Test on the last 5 years of the data (2016Q4 onwards)
+test_size = 20
+X_train = X[:-test_size]
+X_test = X[-test_size:] 
+y_train = y[:-test_size]
+y_test = y[-test_size:]
+
+print(X_test)
+print(X_train)
+print(y_test)
+print(y_train)
+X = df_lag1[[ 'cb',
+ 'cb_lag1',
+ 'cb_lag2',
+ 'cb_lag3',
+ 'cb_lag4',
+ 'infl',
+ 'infl_lag1',
+ 'infl_lag2',
+ 'infl_lag3',
+ 'infl_lag4',
+ 'household_consumption',
+ 'household_consumption_lag1',
+ 'household_consumption_lag2',
+ 'household_consumption_lag3',
+ 'household_consumption_lag4',
+ 'savings_ratio',
+ 'savings_ratio_lag1',
+ 'savings_ratio_lag2',
+ 'savings_ratio_lag3',
+ 'savings_ratio_lag4',
+ 'inactivity',
+ 'inactivity_lag1',
+ 'inactivity_lag2',
+ 'inactivity_lag3',
+ 'inactivity_lag4',
+ 'unemployment',
+ 'unemployment_lag1',
+ 'unemployment_lag2',
+ 'unemployment_lag3',
+ 'unemployment_lag4',
+ 'twhwgr',
+ 'twhwgr_lag1',
+ 'twhwgr_lag2',
+ 'twhwgr_lag3',
+ 'twhwgr_lag4',
+ 'productivity',
+ 'productivity_lag1',
+ 'productivity_lag2',
+ 'productivity_lag3',
+ 'productivity_lag4',
+ 'BoE_interest',
+ 'BoE_interest_lag1',
+ 'BoE_interest_lag2',
+ 'BoE_interest_lag3',
+ 'BoE_interest_lag4',
+ 'eir',
+ 'eir_lag1',
+ 'eir_lag2',
+ 'eir_lag3',
+ 'eir_lag4',
+ 'inv',
+ 'inv_lag1',
+ 'inv_lag2',
+ 'inv_lag3',
+ 'inv_lag4',
+ 'total_gfcf',
+ 'total_gfcf_lag1',
+ 'total_gfcf_lag2',
+ 'total_gfcf_lag3',
+ 'total_gfcf_lag4',
+ 'o_gap',
+ 'o_gap_lag1',
+ 'o_gap_lag2',
+ 'o_gap_lag3',
+ 'o_gap_lag4',
+ 'rgdpgr_QoQ',
+ 'rgdpgr_QoQ_lag1',
+ 'rgdpgr_QoQ_lag2',
+ 'rgdpgr_QoQ_lag3',
+ 'rgdpgr_QoQ_lag4']]
+​
+y = df_lag1[['cgncr',
+ 'cgncr_lag1',
+ 'cgncr_lag2',
+ 'cgncr_lag3',
+ 'cgncr_lag4']]
+​
+# Note issue with Train Test Split in that it randomises observations in the train and test sections. 
+# We need to keep the dates unbroken across train and test
+# Test on the last 5 years of the data (2016Q4 onwards)
+test_size = 20
+X_train = X[:-test_size]
+X_test = X[-test_size:] 
+y_train = y[:-test_size]
+y_test = y[-test_size:]
+​
+print(X_test)
+print(X_train)
+print(y_test)
